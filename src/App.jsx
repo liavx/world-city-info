@@ -11,8 +11,8 @@ const SearchInput = ({
   isLoading,
   selectedCity
 }) => (
-  <div className="relative w-full mb-6">
-    <div className="flex flex-col sm:flex-row gap-2">
+  <div className="w-full max-w-xl relative">
+    <div className="flex gap-2 mb-2">
       <input
         id="city"
         type="text"
@@ -20,28 +20,24 @@ const SearchInput = ({
         onChange={handleInputChange}
         placeholder="Enter a city..."
         disabled={isLoading}
-        className="w-full px-4 py-2 rounded-xl border border-gray-300 text-black disabled:opacity-50"
+        className="w-full px-4 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring focus:border-blue-500"
       />
       <button
         onClick={handleSearch}
         disabled={!selectedCity || isLoading}
-        className="px-4 py-2 bg-blue-600 text-white rounded-xl disabled:opacity-50"
+        className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
       >
-        {isLoading ? (
-          <span className="animate-pulse">Loading...</span>
-        ) : (
-          'Search'
-        )}
+        {isLoading ? 'Loading...' : 'Search'}
       </button>
     </div>
 
     {suggestions.length > 0 && (
-      <ul className="absolute bg-white text-black border border-gray-300 mt-2 w-full rounded-xl shadow-md z-10 max-h-60 overflow-y-auto">
+      <ul className="absolute top-full w-full bg-white border border-gray-300 rounded-md shadow-md z-10">
         {suggestions.map((sug, index) => (
           <li
             key={index}
-            className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
             onClick={() => onSuggestionClick(sug)}
+            className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
           >
             {sug.fullName}
           </li>
@@ -52,44 +48,28 @@ const SearchInput = ({
 )
 
 const WeatherView = ({ data }) => (
-  <div className="bg-white/30 backdrop-blur-md border border-white/20 text-white rounded-xl shadow-md p-4 mb-6 transition-all duration-500 ease-in-out animate-fadeIn hover:scale-[1.01] hover:shadow-lg">
+  <div className="bg-white/80 p-4 rounded-md shadow-md mt-4 w-full max-w-xl">
     <h2 className="text-xl font-semibold mb-2">Weather in {data.location.name}</h2>
     <p>Temperature: {data.current.temp_c}°C</p>
     <p>Condition: {data.current.condition.text}</p>
-    <p>Local Time: {data.location.localtime}</p>
-    <img src={data.current.condition.icon} alt="Weather icon" className="mt-2" />
+    <img src={data.current.condition.icon} alt="Weather icon" />
   </div>
 )
 
-const CityIntro = ({ text }) => {
-  if (!text) return null
-  return (
-    <div className="bg-white/30 backdrop-blur-md border border-white/20 text-white rounded-xl shadow-md p-4 mb-6 transition-all duration-500 ease-in-out animate-fadeIn hover:scale-[1.01] hover:shadow-lg">
-      <h2 className="text-xl font-semibold mb-2">About the City</h2>
-      <p>{text}</p>
-    </div>
-  )
-}
-
 const EventsView = ({ events }) => {
   if (events.length === 0) {
-    return <p className="text-sm text-white/70">No events found this weekend.</p>
+    return <p className="text-white mt-4">No events found this weekend.</p>
   }
 
   return (
-    <div className="bg-white/30 backdrop-blur-md border border-white/20 text-white rounded-xl shadow-md p-4 mb-6 transition-all duration-500 ease-in-out animate-fadeIn hover:scale-[1.01] hover:shadow-lg">
+    <div className="bg-white/80 p-4 rounded-md shadow-md mt-4 w-full max-w-xl">
       <h2 className="text-xl font-semibold mb-2">Events This Weekend</h2>
-      <ul className="space-y-3">
+      <ul>
         {events.map((event, index) => (
-          <li key={index}>
+          <li key={index} className="mb-3">
             <strong>{event.name}</strong> – {event.dates.start.localDate}
             <br />
-            <a
-              href={event.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-300 underline"
-            >
+            <a href={event.url} target="_blank" className="text-blue-600 underline">
               Tickets
             </a>
           </li>
@@ -107,58 +87,27 @@ function App() {
   const [selectedCity, setSelectedCity] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [events, setEvents] = useState([])
-  const [wikiIntro, setWikiIntro] = useState('')
-  const [bgImage, setBgImage] = useState('')
+  const [cityPhoto, setCityPhoto] = useState(null)
+  const [debounceTimer, setDebounceTimer] = useState(null)
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      const fetchSuggestions = async () => {
-        if (city.length < 3) {
-          setSuggestions([])
-          return
+  const fetchCityPhoto = async (cityName) => {
+    try {
+      const response = await axios.get(`https://api.unsplash.com/search/photos`, {
+        params: {
+          query: cityName,
+          orientation: 'landscape',
+          per_page: 1
+        },
+        headers: {
+          Authorization: `Client-ID ${import.meta.env.VITE_UNSPLASH_ACCESS_KEY}`
         }
-
-        try {
-          const response = await axios.get('https://wft-geo-db.p.rapidapi.com/v1/geo/cities', {
-            params: { namePrefix: city, limit: 10 },
-            headers: {
-              'X-RapidAPI-Key': import.meta.env.VITE_GEODB_API_KEY,
-              'X-RapidAPI-Host': 'wft-geo-db.p.rapidapi.com'
-            }
-          })
-
-          const rawResults = response.data.data.map((item) => ({
-            name: item.city,
-            country: item.country,
-            fullName: `${item.city}, ${item.country}`
-          }))
-
-          const uniqueResults = Array.from(
-            new Map(rawResults.map(obj => [obj.fullName, obj])).values()
-          )
-
-          setSuggestions(uniqueResults)
-        } catch (error) {
-          console.error('Error fetching city suggestions:', error)
-          setSuggestions([])
-        }
-      }
-
-      fetchSuggestions()
-    }, 500)
-
-    return () => clearTimeout(timeout)
-  }, [city])
-
-  const handleInputChange = (event) => {
-    setCity(event.target.value)
-    setSelectedCity(null)
-    setSuggestions([])
-    setWeatherData(null)
-    setEvents([])
-    setWikiIntro('')
-    setBgImage('')
-    setError(null)
+      })
+      const url = response.data.results[0]?.urls?.regular
+      setCityPhoto(url || null)
+    } catch (error) {
+      console.error('Error fetching city photo:', error)
+      setCityPhoto(null)
+    }
   }
 
   const getUpcomingSunday = () => {
@@ -168,6 +117,59 @@ function App() {
     const sunday = new Date(today)
     sunday.setDate(today.getDate() + daysUntilSunday)
     return sunday.toISOString().split('T')[0] + 'T23:59:59Z'
+  }
+
+  const fetchSuggestions = async (input) => {
+    if (input.length < 3) {
+      setSuggestions([])
+      return
+    }
+    try {
+      const response = await axios.get('https://wft-geo-db.p.rapidapi.com/v1/geo/cities', {
+        params: { namePrefix: input, limit: 10 },
+        headers: {
+          'X-RapidAPI-Key': import.meta.env.VITE_GEODB_API_KEY,
+          'X-RapidAPI-Host': 'wft-geo-db.p.rapidapi.com'
+        }
+      })
+
+      const cityResults = response.data.data.map((item) => ({
+        name: item.city,
+        country: item.country,
+        fullName: `${item.city}, ${item.country}`
+      }))
+
+      const uniqueResults = cityResults.filter(
+        (value, index, self) =>
+          index === self.findIndex((v) => v.fullName === value.fullName)
+      )
+
+      setSuggestions(uniqueResults)
+    } catch (error) {
+      console.error('Error fetching city suggestions:', error)
+      setSuggestions([])
+    }
+  }
+
+  const handleInputChange = (event) => {
+    const value = event.target.value
+    setCity(value)
+    setSelectedCity(null)
+    setSuggestions([])
+    setWeatherData(null)
+    setError(null)
+
+    if (debounceTimer) clearTimeout(debounceTimer)
+    const timer = setTimeout(() => {
+      fetchSuggestions(value)
+    }, 400)
+    setDebounceTimer(timer)
+  }
+
+  const handleSuggestionClick = (cityObj) => {
+    setSelectedCity(cityObj)
+    setCity(cityObj.fullName)
+    setSuggestions([])
   }
 
   const handleSearch = async () => {
@@ -184,7 +186,7 @@ function App() {
       setWeatherData(weatherResponse.data)
       setError(null)
 
-      const eventResponse = await axios.get(
+      const eventsResponse = await axios.get(
         `https://app.ticketmaster.com/discovery/v2/events.json`,
         {
           params: {
@@ -197,42 +199,34 @@ function App() {
           }
         }
       )
-
-      const eventData = eventResponse.data._embedded?.events || []
+      const eventData = eventsResponse.data._embedded?.events || []
       setEvents(eventData)
 
-      const wikiResponse = await axios.get(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(selectedCity.name)}`
-      )
-      setWikiIntro(wikiResponse.data.extract)
-
-      setBgImage(`https://source.unsplash.com/1600x900/?${selectedCity.name},city`)
+      await fetchCityPhoto(selectedCity.name)
     } catch (err) {
-      console.error('Data fetch failed:', err)
+      console.error('Weather/Events fetch failed:', err)
       setWeatherData(null)
-      setWikiIntro('')
-      setEvents([])
       setError('Could not fetch data for that city.')
+      setEvents([])
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleSuggestionClick = (cityObj) => {
-    setSelectedCity(cityObj)
-    setCity(cityObj.fullName)
-    setSuggestions([])
-  }
-
   return (
     <div
-      className="min-h-screen bg-cover bg-center text-white flex justify-center items-start py-12 px-4 transition-all duration-700"
+      className="min-h-screen bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: `url(${bgImage || '/default.jpg'})`,
-        backgroundColor: '#0d0d0d'
+        backgroundImage: cityPhoto
+          ? `url(${cityPhoto})`
+          : "url('/background.jpg')"
       }}
     >
-      <div className="w-full max-w-xl px-4 sm:px-6 md:px-8 bg-black/40 backdrop-blur-lg rounded-xl p-6 shadow-2xl">
+      <div className="min-h-screen bg-black/60 backdrop-blur-sm p-6 flex flex-col items-center">
+        <h1 className="text-3xl font-bold text-white mb-6 drop-shadow-lg">
+          World City Info
+        </h1>
+
         <SearchInput
           city={city}
           handleInputChange={handleInputChange}
@@ -242,10 +236,10 @@ function App() {
           isLoading={isLoading}
           selectedCity={selectedCity}
         />
-        {error && <p className="text-red-400 mb-4">{error}</p>}
+
+        {error && <p className="text-red-400 mt-2">{error}</p>}
         {weatherData && <WeatherView data={weatherData} />}
-        {weatherData && <EventsView events={events} />}
-        {weatherData && <CityIntro text={wikiIntro} />}
+        {events && <EventsView events={events} />}
       </div>
     </div>
   )
