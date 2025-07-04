@@ -1,16 +1,9 @@
-/* eslint-disable react/prop-types */
-import { useState, useEffect } from 'react'
+// App.jsx
+import { useState } from 'react'
 import axios from 'axios'
+import CityMap from './CityMap'
 
-const SearchInput = ({
-  city,
-  handleInputChange,
-  handleSearch,
-  suggestions,
-  onSuggestionClick,
-  isLoading,
-  selectedCity
-}) => (
+const SearchInput = ({ city, handleInputChange, handleSearch, suggestions, onSuggestionClick, isLoading, selectedCity }) => (
   <div className="w-full max-w-xl relative">
     <div className="flex gap-2 mb-2">
       <input
@@ -30,15 +23,10 @@ const SearchInput = ({
         {isLoading ? 'Loading...' : 'Search'}
       </button>
     </div>
-
     {suggestions.length > 0 && (
       <ul className="absolute top-full w-full bg-white border border-gray-300 rounded-md shadow-md z-10">
         {suggestions.map((sug, index) => (
-          <li
-            key={index}
-            onClick={() => onSuggestionClick(sug)}
-            className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
-          >
+          <li key={index} onClick={() => onSuggestionClick(sug)} className="px-4 py-2 hover:bg-blue-100 cursor-pointer">
             {sug.fullName}
           </li>
         ))}
@@ -58,9 +46,7 @@ const WeatherView = ({ data }) => (
 
 const EventsView = ({ events, hasSearched }) => {
   if (!hasSearched) return null
-  if (events.length === 0) {
-    return <p className="text-white mt-4">No events found this weekend.</p>
-  }
+  if (events.length === 0) return <p className="text-white mt-4">No events found this weekend.</p>
 
   return (
     <div className="bg-white/80 p-4 rounded-md shadow-md mt-4 w-full max-w-xl">
@@ -70,9 +56,7 @@ const EventsView = ({ events, hasSearched }) => {
           <li key={index} className="mb-3">
             <strong>{event.name}</strong> – {event.dates.start.localDate}
             <br />
-            <a href={event.url} target="_blank" className="text-blue-600 underline">
-              Tickets
-            </a>
+            <a href={event.url} target="_blank" className="text-blue-600 underline">Tickets</a>
           </li>
         ))}
       </ul>
@@ -90,47 +74,33 @@ const WikiSummary = ({ summary, city }) =>
 
 function App() {
   const [city, setCity] = useState('')
-  const [weatherData, setWeatherData] = useState(null)
-  const [error, setError] = useState(null)
   const [suggestions, setSuggestions] = useState([])
   const [selectedCity, setSelectedCity] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [weatherData, setWeatherData] = useState(null)
   const [events, setEvents] = useState([])
   const [cityPhoto, setCityPhoto] = useState(null)
-  const [debounceTimer, setDebounceTimer] = useState(null)
   const [wikiSummary, setWikiSummary] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [debounceTimer, setDebounceTimer] = useState(null)
 
-  const fetchCityPhoto = async (cityName) => {
-    try {
-      const response = await axios.get(`https://api.unsplash.com/search/photos`, {
-        params: { query: cityName, orientation: 'landscape', per_page: 1 },
-        headers: {
-          Authorization: `Client-ID ${import.meta.env.VITE_UNSPLASH_ACCESS_KEY}`
-        }
-      })
-      const url = response.data.results[0]?.urls?.regular
-      setCityPhoto(url || null)
-    } catch (error) {
-      console.error('Error fetching city photo:', error)
-      setCityPhoto(null)
-    }
-  }
+  const handleInputChange = (event) => {
+    const value = event.target.value
+    setCity(value)
+    setSelectedCity(null)
+    setSuggestions([])
+    setWeatherData(null)
+    setEvents([])
+    setWikiSummary('')
+    setHasSearched(false)
 
-  const getUpcomingSunday = () => {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    const daysUntilSunday = 7 - dayOfWeek
-    const sunday = new Date(today)
-    sunday.setDate(today.getDate() + daysUntilSunday)
-    return sunday.toISOString().split('T')[0] + 'T23:59:59Z'
+    if (debounceTimer) clearTimeout(debounceTimer)
+    const timer = setTimeout(() => fetchSuggestions(value), 400)
+    setDebounceTimer(timer)
   }
 
   const fetchSuggestions = async (input) => {
-    if (input.length < 3) {
-      setSuggestions([])
-      return
-    }
+    if (input.length < 3) return setSuggestions([])
 
     try {
       const response = await axios.get('https://wft-geo-db.p.rapidapi.com/v1/geo/cities', {
@@ -141,39 +111,17 @@ function App() {
         }
       })
 
-      const cityResults = response.data.data.map((item) => ({
+      const results = response.data.data.map((item) => ({
         name: item.city,
         country: item.country,
         fullName: `${item.city}, ${item.country}`
       }))
 
-      const uniqueResults = cityResults.filter(
-        (value, index, self) =>
-          index === self.findIndex((v) => v.fullName === value.fullName)
-      )
-
+      const uniqueResults = results.filter((v, i, a) => i === a.findIndex((t) => t.fullName === v.fullName))
       setSuggestions(uniqueResults)
-    } catch (error) {
-      console.error('Error fetching city suggestions:', error)
-      setSuggestions([])
+    } catch (err) {
+      console.error('Error fetching city suggestions:', err)
     }
-  }
-
-  const handleInputChange = (event) => {
-    const value = event.target.value
-    setCity(value)
-    setSelectedCity(null)
-    setSuggestions([])
-    setWeatherData(null)
-    setError(null)
-    setWikiSummary('')
-    setHasSearched(false)
-
-    if (debounceTimer) clearTimeout(debounceTimer)
-    const timer = setTimeout(() => {
-      fetchSuggestions(value)
-    }, 400)
-    setDebounceTimer(timer)
   }
 
   const handleSuggestionClick = (cityObj) => {
@@ -183,53 +131,39 @@ function App() {
   }
 
   const handleSearch = async () => {
-    if (!selectedCity || !selectedCity.name) {
-      setError('Please select a city from the list.')
-      return
-    }
+    if (!selectedCity?.name) return
 
     setIsLoading(true)
     setHasSearched(true)
+
     try {
-      // 1. Weather
-      const weatherResponse = await axios.get(
+      const weatherRes = await axios.get(
         `https://api.weatherapi.com/v1/current.json?key=${import.meta.env.VITE_WEATHER_API_KEY}&q=${selectedCity.name}&aqi=no`
       )
-      setWeatherData(weatherResponse.data)
+      setWeatherData(weatherRes.data)
 
-      // 2. Events
-      const eventsResponse = await axios.get(
-        `https://app.ticketmaster.com/discovery/v2/events.json`,
-        {
-          params: {
-            apikey: import.meta.env.VITE_TICKETMASTER_API_KEY,
-            city: selectedCity.name,
-            startDateTime: new Date().toISOString().split('T')[0] + 'T00:00:00Z',
-            endDateTime: getUpcomingSunday(),
-            sort: 'date,asc',
-            size: 5
-          }
+      const eventsRes = await axios.get(`https://app.ticketmaster.com/discovery/v2/events.json`, {
+        params: {
+          apikey: import.meta.env.VITE_TICKETMASTER_API_KEY,
+          city: selectedCity.name,
+          startDateTime: new Date().toISOString().split('T')[0] + 'T00:00:00Z',
+          endDateTime: new Date().toISOString().split('T')[0] + 'T23:59:59Z',
+          size: 5
         }
-      )
-      const eventData = eventsResponse.data._embedded?.events || []
+      })
+      const eventData = eventsRes.data._embedded?.events || []
       setEvents(eventData)
 
-      // 3. Photo
-      await fetchCityPhoto(selectedCity.name)
+      const photoRes = await axios.get(`https://api.unsplash.com/search/photos`, {
+        params: { query: selectedCity.name, orientation: 'landscape', per_page: 1 },
+        headers: { Authorization: `Client-ID ${import.meta.env.VITE_UNSPLASH_ACCESS_KEY}` }
+      })
+      setCityPhoto(photoRes.data.results[0]?.urls?.regular || null)
 
-      // 4. Wikipedia
-      const wikiResponse = await axios.get(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${selectedCity.name}`
-      )
-      setWikiSummary(wikiResponse.data.extract || '')
-
-      setError(null)
+      const wikiRes = await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${selectedCity.name}`)
+      setWikiSummary(wikiRes.data.extract || '')
     } catch (err) {
-      console.error('Search failed:', err)
-      setWeatherData(null)
-      setEvents([])
-      setWikiSummary('')
-      setError('Could not fetch data for that city.')
+      console.error('Search error:', err)
     } finally {
       setIsLoading(false)
     }
@@ -245,9 +179,7 @@ function App() {
       }}
     >
       <div className="min-h-screen bg-black/60 backdrop-blur-sm p-6 flex flex-col items-center">
-        <h1 className="text-3xl font-bold text-white mb-6 drop-shadow-lg">
-          World City Info
-        </h1>
+        <h1 className="text-3xl font-bold text-white mb-6 drop-shadow-lg">World City Info</h1>
 
         <SearchInput
           city={city}
@@ -259,8 +191,20 @@ function App() {
           selectedCity={selectedCity}
         />
 
-        {error && <p className="text-red-400 mt-2">{error}</p>}
-        {weatherData && <WeatherView data={weatherData} />}
+        {weatherData && (
+          <>
+            <WeatherView data={weatherData} />
+            <div className="text-white mt-2">
+              <p><strong>Local Time:</strong> {weatherData.location.localtime}</p>
+            </div>
+            <CityMap
+              lat={weatherData.location.lat}
+              lon={weatherData.location.lon}
+              name={weatherData.location.name}
+            />
+          </>
+        )}
+
         <EventsView events={events} hasSearched={hasSearched} />
         <WikiSummary summary={wikiSummary} city={selectedCity?.name} />
       </div>
